@@ -16,21 +16,9 @@
             <appearance>
               <material diffuseColor="1 1 0"></material>
             </appearance>
-            <sphere radius="0.5"></sphere>
+            <sphere radius="0.1"></sphere>
           </shape>
-          <!-- 添加太阳的标签 -->
-          <billboard>
-            <transform translation="0 1.2 0">
-              <shape>
-                <text string='"Sun"' solid='false'>
-                  <fontstyle size='0.2' justify='"MIDDLE" "MIDDLE"' />
-                </text>
-                <appearance>
-                  <material diffuseColor="1 1 1"></material>
-                </appearance>
-              </shape>
-            </transform>
-          </billboard>
+
         </transform>
         <viewpoint fieldOfView="0.785398" position="3 3 3" orientation="1 -1 0 -0.785"></viewpoint>
       </scene>
@@ -81,14 +69,26 @@ export default {
       }
 
       // 创建天体轨道对象
-      this.heavenlyBodies.push(new Trajectory("Venus", 0.72333199, 3.39471, 54.9, 0.00677323, 76.7, 181.98, 0.615));
-      this.heavenlyBodies.push(new Trajectory("theEarth", 1, 0.00005, 102.94719, 0.01671022, 0, 100.47, 1));
-      this.heavenlyBodies.push(new Trajectory("Mars", 1.52366231, 1.85061, 286.5, 0.09339, 49.57854, 355.43, 1.881));
+      this.heavenlyBodies.push(new Trajectory("Mercury", 0.38709927, 7.00497902, 77.45779628, 0.20563593, 48.33076593, 174.79252722, 0.2408467));
+      this.heavenlyBodies.push(new Trajectory("Venus", 0.72333566, 3.39467605, 131.60246718, 0.00677672, 76.67984255, 181.97909950, 0.615));
+      this.heavenlyBodies.push(new Trajectory("theEarth", 1.00000261, -0.00001531, 102.93768193, 0.01671123, 0.0, 100.46457166, 1));
+      this.heavenlyBodies.push(new Trajectory("Mars", 1.52371034, 1.84969142, -23.94362959, 0.09339410, 49.55953891, -4.55343205, 1.8808476));
+      this.heavenlyBodies.push(new Trajectory("Jupiter", 5.20288700, 1.30439695, 14.72847983, 0.04838624, 100.47390909, 34.39644051, 11.862));
+      this.heavenlyBodies.push(new Trajectory("Saturn", 9.53667594, 2.48599187, 92.59887831, 0.05386179, 113.66242448, 49.95424423, 29.4571));
+      this.heavenlyBodies.push(new Trajectory("Uranus", 19.18916464, 0.77263783, 170.95427630, 0.04725744, 74.01692503, 313.23810451, 84.016846));
+      this.heavenlyBodies.push(new Trajectory("Neptune", 30.06992276, 1.77004347, 44.96476227, 0.00859048, 131.78422574, -55.12002969, 164.79132));
 
       // 添加天体到X3D场景
-      this.addNode("Venus", 0.9, 0.9, 0.9, 0.15, "Venus");
-      this.addNode("theEarth", 0.2, 0, 0.8, 0.15, "Earth");
-      this.addNode("Mars", 1, 0.1, 0.15, 0.1, "Mars");
+      this.addNode("Mercury", 0.7, 0.2, 0.4, 0.024, "Mercury");
+      this.addNode("Venus", 0.9, 0.9, 0.9, 0.061, "Venus");
+      this.addNode("theEarth", 0.2, 0, 0.8, 0.064, "Earth");
+      this.addNode("Mars", 1, 0.1, 0.15, 0.034, "Mars");
+      this.addNode("Jupiter", 1, 0.5, 0, 0.699, "Jupiter");
+      this.addNode("Saturn", 0.9, 0.7, 0.1, 0.582, "Saturn");
+      this.addNode("Uranus", 0.6, 0.8, 1, 0.254, "Uranus");
+      this.addNode("Neptune", 0.1, 0.2, 0.9, 0.246, "Neptune");
+
+
     },
 
     // 添加天体到X3D场景
@@ -187,7 +187,7 @@ export default {
     updatePosition() {
       for (const hB of this.heavenlyBodies) {
         // 更新真实近点角
-        hB.trueAnomoly += (2 * Math.PI)* this.simSpeed / (hB.period * 365.25   );
+        hB.trueAnomoly += (2 * Math.PI) * this.simSpeed / (hB.period * 365.25);
         if (hB.trueAnomoly > 2 * Math.PI) {
           hB.trueAnomoly -= 2 * Math.PI; // 确保角度不会超出 2π
         }
@@ -253,5 +253,4 @@ export default {
   clear: both;
   border-top: 0px solid #fff;
 }
-
 </style>
