@@ -1,25 +1,38 @@
 <template>
   <div>
-    <h1>Venus, Earth, Mars and Potentially Hazardous Asteroids (PHA)*</h1> 
+    <h1>Venus, Earth, Mars and Potentially Hazardous Asteroids (PHA)*</h1>
     <h2>Slider control adjusts the simulation speed.</h2>
-    <!-- <ul>
+    <ul>
       <li>Right-click and drag to zoom in and out</li>
       <li>Left-click and drag to rotate model</li>
       <li>Middle-click and drag to move model</li>
-    </ul> -->
+    </ul>
 
-    <x3d width="800px" height="600px">
+    <x3d width="100%" height="40%">
       <scene>
-        <background DEF="bgnd" transparency="0" skyColor="0.75 0.75 0.75"></background>
+        <background DEF="bgnd" transparency="0" backUrl="/star.jpg"></background>
         <transform id="theSun" translation="0 0 0">
           <shape>
             <appearance>
               <material diffuseColor="1 1 0"></material>
             </appearance>
-            <sphere radius="0.7"></sphere>
+            <sphere radius="0.5"></sphere>
           </shape>
+          <!-- 添加太阳的标签 -->
+          <billboard>
+            <transform translation="0 1.2 0">
+              <shape>
+                <text string='"Sun"' solid='false'>
+                  <fontstyle size='0.2' justify='"MIDDLE" "MIDDLE"' />
+                </text>
+                <appearance>
+                  <material diffuseColor="1 1 1"></material>
+                </appearance>
+              </shape>
+            </transform>
+          </billboard>
         </transform>
-        <viewpoint fieldOfView="0.785398" position="6 5.5 6.5" orientation="1 -1 0 -0.785"></viewpoint>
+        <viewpoint fieldOfView="0.785398" position="3 3 3" orientation="1 -1 0 -0.785"></viewpoint>
       </scene>
     </x3d>
 
@@ -47,24 +60,24 @@ export default {
   mounted() {
     this.initializeSolarSystem(); // 初始化场景和天体
     this.traceOrbits();           // 绘制轨道
-    setInterval(this.updatePosition, 50); // 更新天体位置
+    setInterval(this.updatePosition, 50); // 更新天体位置，每50ms更新一次
   },
   methods: {
     // 初始化天体和轨道参数
     initializeSolarSystem() {
       // 定义轨道对象
       function Trajectory(name, smA, oI, aP, oE, aN, mAe, Sidereal) {
-        this.name = name;
-        this.smA = smA;
-        this.oI = oI * 0.01745329; // 度转为弧度
-        this.aP = aP * 0.01745329;
-        this.oE = oE;
-        this.aN = aN * 0.01745329;
-        this.period = Sidereal;
-        this.epochMeanAnomaly = mAe * 0.01745329;
-        this.trueAnomoly = 0;
-        this.position = [0, 0, 0];
-        this.time = 0;
+        this.name = name;                       // 天体名称
+        this.smA = smA;                         // 半长轴（天体轨道的大小）
+        this.oI = oI * 0.01745329;              // 倾角（从度转换为弧度）
+        this.aP = aP * 0.01745329;              // 近地点参数（从度转换为弧度）
+        this.oE = oE;                           // 轨道离心率（0 为圆形轨道，接近 1 为椭圆轨道）
+        this.aN = aN * 0.01745329;              // 升交点经度（从度转换为弧度）
+        this.period = Sidereal;                 // 轨道周期（以地球年为单位）
+        this.epochMeanAnomaly = mAe * 0.01745329; // 平近点角（从度转换为弧度）
+        this.trueAnomoly = 0;                   // 初始化真实近点角
+        this.position = [0, 0, 0];              // 当前天体的三维位置
+        this.time = 0;                          // 记录天体运动的时间
       }
 
       // 创建天体轨道对象
@@ -73,32 +86,58 @@ export default {
       this.heavenlyBodies.push(new Trajectory("Mars", 1.52366231, 1.85061, 286.5, 0.09339, 49.57854, 355.43, 1.881));
 
       // 添加天体到X3D场景
-      this.addNode("Venus", 0.9, 0.9, 0.9, 0.15);
-      this.addNode("theEarth", 0.2, 0, 0.8, 0.15);
-      this.addNode("Mars", 1, 0.1, 0.15, 0.1);
+      this.addNode("Venus", 0.9, 0.9, 0.9, 0.15, "Venus");
+      this.addNode("theEarth", 0.2, 0, 0.8, 0.15, "Earth");
+      this.addNode("Mars", 1, 0.1, 0.15, 0.1, "Mars");
     },
 
     // 添加天体到X3D场景
-    addNode(identifier, cR, cG, cB, radius) {
+    addNode(identifier, cR, cG, cB, radius, label) {
+      // 创建 Transform 节点用于存放天体的空间变换
       const t = document.createElement('Transform');
-      t.setAttribute('translation', '0 0 -5');
-      t.setAttribute('id', identifier);
+      t.setAttribute('translation', '0 0 -5'); // 设置初始位置
+      t.setAttribute('id', identifier);        // 设置节点的 id，使用天体标识符
 
+      // 创建 Shape 节点表示天体的形状
       const s = document.createElement('Shape');
-      const app = document.createElement('Appearance');
-      const mat = document.createElement('Material');
+      const app = document.createElement('Appearance');   // 创建 Appearance 节点用于定义外观
+      const mat = document.createElement('Material');     // 创建 Material 节点用于定义材质颜色
       mat.setAttribute('id', identifier + 'Mat');
-      mat.setAttribute('diffuseColor', `${cR} ${cG} ${cB}`);
-      app.appendChild(mat);
-      s.appendChild(app);
+      mat.setAttribute('diffuseColor', `${cR} ${cG} ${cB}`); // 设置材质的漫反射颜色
+      app.appendChild(mat);                               // 将材质添加到外观节点
+      s.appendChild(app);                                 // 将外观添加到形状节点
 
+      // 创建 Sphere 节点表示天体的几何形状
       const b = document.createElement('Sphere');
-      b.setAttribute('radius', radius);
-      s.appendChild(b);
-      t.appendChild(s);
+      b.setAttribute('radius', radius);                   // 设置球体半径
+      s.appendChild(b);                                   // 将球体添加到形状节点
+      t.appendChild(s);                                   // 将形状节点添加到 Transform 节点
 
+      // 添加标签
+      const billboard = document.createElement('Billboard');
+      const labelTransform = document.createElement('Transform');
+      labelTransform.setAttribute('translation', `0 ${radius + 0.2} 0`);
+      const labelShape = document.createElement('Shape');
+      const labelText = document.createElement('Text');
+      labelText.setAttribute('string', `"${label}"`);
+      const labelFont = document.createElement('FontStyle');
+      labelFont.setAttribute('size', '0.2');
+      labelFont.setAttribute('justify', '"MIDDLE" "MIDDLE"');
+      labelText.appendChild(labelFont);
+      labelShape.appendChild(labelText);
+
+      const labelAppearance = document.createElement('Appearance');
+      const labelMaterial = document.createElement('Material');
+      labelMaterial.setAttribute('diffuseColor', '1 1 1');
+      labelAppearance.appendChild(labelMaterial);
+      labelShape.appendChild(labelAppearance);
+
+      labelTransform.appendChild(labelShape);
+      billboard.appendChild(labelTransform);
+      t.appendChild(billboard);
+      // 找到场景中的太阳节点，并将天体添加到该节点下
       const ot = document.getElementById('theSun');
-      ot.appendChild(t);
+      ot.appendChild(t);                                  // 将新天体添加到场景
     },
 
     // 计算和绘制轨道
@@ -147,6 +186,11 @@ export default {
     // 更新天体位置
     updatePosition() {
       for (const hB of this.heavenlyBodies) {
+        // 更新真实近点角
+        hB.trueAnomoly += (2 * Math.PI)* this.simSpeed / (hB.period * 365.25   );
+        if (hB.trueAnomoly > 2 * Math.PI) {
+          hB.trueAnomoly -= 2 * Math.PI; // 确保角度不会超出 2π
+        }
         const currentPosition = this.propagate(hB, hB.trueAnomoly);
         document.getElementById(hB.name).setAttribute('translation', currentPosition.join(' '));
       }
@@ -169,12 +213,12 @@ export default {
       }
     },
 
-    // // 控制显示/隐藏标签
-    // toggleLabels() {
-    //   this.solidLabels = !this.solidLabels;
-    //   const opacity = this.solidLabels ? 1 : 0;
-    //   // 控制标签的显示/隐藏逻辑（可以根据需求添加具体标签）
-    // },
+    // 控制显示/隐藏标签
+    toggleLabels() {
+      this.solidLabels = !this.solidLabels;
+      // const opacity = this.solidLabels ? 1 : 0;
+      // 控制标签的显示/隐藏逻辑（可以根据需求添加具体标签）
+    },
 
     // 滑动条改变速度
     showValue(newValue) {
@@ -209,4 +253,5 @@ export default {
   clear: both;
   border-top: 0px solid #fff;
 }
+
 </style>
