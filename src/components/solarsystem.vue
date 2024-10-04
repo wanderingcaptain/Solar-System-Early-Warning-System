@@ -14,17 +14,29 @@
         <transform id="theSun" translation="0 0 0">
           <shape>
             <appearance>
-              <material diffuseColor="1 1 0"></material>
+              <material diffuseColor="1 0.1 0.15"></material>
             </appearance>
-            <sphere radius="0.1"></sphere>
+            <sphere radius="0.6"></sphere>
           </shape>
-
+          <!-- 添加太阳的标签 -->
+          <billboard>
+            <transform translation="0 1.2 0">
+              <shape>
+                <text string='"Sun"' solid='false'>
+                  <fontstyle size='0.2' justify='"MIDDLE" "MIDDLE"' />
+                </text>
+                <appearance>
+                  <material diffuseColor="1 1 1"></material>
+                </appearance>
+              </shape>
+            </transform>
+          </billboard>
         </transform>
         <viewpoint fieldOfView="0.785398" position="3 3 3" orientation="1 -1 0 -0.785"></viewpoint>
       </scene>
     </x3d>
 
-    <input type="range" id="myRange" min="1" max="100" value="100" step="1" @change="showValue" /><br>
+    <input type="range" id="myRange" min="1" max="100" value="100" step="1" onchange="showValue(this.value)" /><br>
     <input type="button" id="orbits" value="Toggle Orbits" @click="toggleOrbits" />
     <input type="button" id="labels" value="Toggle Labels" @click="toggleLabels" />
 
@@ -34,6 +46,21 @@
 </template>
 
 <script>
+// 将 Trajectory 函数定义在 Vue 组件外部
+function Trajectory(name, smA, oI, aP, oE, aN, mAe, Sidereal) {
+  this.name = name;                       // 天体名称
+  this.smA = smA * 7;                         // 半长轴（天体轨道的大小）
+  this.oI = oI * 0.01745329;              // 倾角（从度转换为弧度）
+  this.aP = aP * 0.01745329;              // 近地点参数（从度转换为弧度）
+  this.oE = oE;                           // 轨道离心率（0 为圆形轨道，接近 1 为椭圆轨道）
+  this.aN = aN * 0.01745329;              // 升交点经度（从度转换为弧度）
+  this.period = Sidereal;                 // 轨道周期（以地球年为单位）
+  this.epochMeanAnomaly = mAe * 0.01745329; // 平近点角（从度转换为弧度）
+  this.trueAnomoly = 0;                   // 初始化真实近点角
+  this.position = [0, 0, 0];              // 当前天体的三维位置
+  this.time = 0;                          // 记录天体运动的时间
+}
+
 export default {
   name: 'SolarSystem',
   data() {
@@ -47,28 +74,14 @@ export default {
   },
   mounted() {
     this.initializeSolarSystem(); // 初始化场景和天体
+    this.addCometsFromJson('https://data.nasa.gov/resource/b67r-rgxc.json');
     this.traceOrbits();           // 绘制轨道
     setInterval(this.updatePosition, 50); // 更新天体位置，每50ms更新一次
   },
   methods: {
     // 初始化天体和轨道参数
     initializeSolarSystem() {
-      // 定义轨道对象
-      function Trajectory(name, smA, oI, aP, oE, aN, mAe, Sidereal) {
-        this.name = name;                       // 天体名称
-        this.smA = smA;                         // 半长轴（天体轨道的大小）
-        this.oI = oI * 0.01745329;              // 倾角（从度转换为弧度）
-        this.aP = aP * 0.01745329;              // 近地点参数（从度转换为弧度）
-        this.oE = oE;                           // 轨道离心率（0 为圆形轨道，接近 1 为椭圆轨道）
-        this.aN = aN * 0.01745329;              // 升交点经度（从度转换为弧度）
-        this.period = Sidereal;                 // 轨道周期（以地球年为单位）
-        this.epochMeanAnomaly = mAe * 0.01745329; // 平近点角（从度转换为弧度）
-        this.trueAnomoly = 0;                   // 初始化真实近点角
-        this.position = [0, 0, 0];              // 当前天体的三维位置
-        this.time = 0;                          // 记录天体运动的时间
-      }
-
-      // 创建天体轨道对象
+      // 使用外部定义的 Trajectory 函数
       this.heavenlyBodies.push(new Trajectory("Mercury", 0.38709927, 7.00497902, 77.45779628, 0.20563593, 48.33076593, 174.79252722, 0.2408467));
       this.heavenlyBodies.push(new Trajectory("Venus", 0.72333566, 3.39467605, 131.60246718, 0.00677672, 76.67984255, 181.97909950, 0.615));
       this.heavenlyBodies.push(new Trajectory("theEarth", 1.00000261, -0.00001531, 102.93768193, 0.01671123, 0.0, 100.46457166, 1));
@@ -87,8 +100,42 @@ export default {
       this.addNode("Saturn", 0.9, 0.7, 0.1, 0.582, "Saturn");
       this.addNode("Uranus", 0.6, 0.8, 1, 0.254, "Uranus");
       this.addNode("Neptune", 0.1, 0.2, 0.9, 0.246, "Neptune");
+    },
 
+    // 异步获取彗星数据并添加到轨道
+    async addCometsFromJson(url) {
+      try {
+        const response = await fetch(url);
+        const cometsData = await response.json();
 
+        cometsData.forEach(comet => {
+          const name = comet.object_name;
+          const smA = (parseFloat(comet.q_au_1) + parseFloat(comet.q_au_2)) / 2; // 估算半长轴，使用近日点和远日点平均值
+          const e = parseFloat(comet.e);
+          const i = parseFloat(comet.i_deg);
+          const w = parseFloat(comet.w_deg);
+          const node = parseFloat(comet.node_deg);
+          const period = parseFloat(comet.p_yr);
+
+          // 平近点角的计算（根据公式：M = 2π / T * (t - tp)）
+          const t = parseFloat(comet.epoch_tdb);   // 纪元时间
+          const tp = parseFloat(comet.tp_tdb);     // 近日点通过时间
+          const T = period * 365.25;               // 轨道周期，转换为天
+          const M = ((2 * Math.PI) / T) * (t - tp); // 计算平近点角
+          const mae = M % (2 * Math.PI);           // 归一化平近点角
+
+          const cometTrajectory = new Trajectory(name, smA, i, w, e, node, mae, period); // 使用计算的平近点角
+
+          this.heavenlyBodies.push(cometTrajectory);
+
+          const colorR = 0.5, colorG = 0.5, colorB = 1;
+          const radius = 0.05;
+          this.addNode(name, colorR, colorG, colorB, radius, name);
+          // this.traceOrbits();  //绘制轨道电脑会很卡
+        });
+      } catch (error) {
+        console.error("获取或处理彗星数据时发生错误: ", error);
+      }
     },
 
     // 添加天体到X3D场景
@@ -215,10 +262,19 @@ export default {
 
     // 控制显示/隐藏标签
     toggleLabels() {
+
+
+      // 获取所有标签元素，假设标签的 id 格式为 `${planetName}_label`
+      this.heavenlyBodies.forEach(body => {
+        const labelElement = document.getElementById(`${body.name}_label`);
+        if (labelElement) {
+          labelElement.setAttribute('opacity', this.solidLabels ? '1' : '0'); // 设置透明度
+        }
+      });
+      // 切换标签显示/隐藏的状态
       this.solidLabels = !this.solidLabels;
-      // const opacity = this.solidLabels ? 1 : 0;
-      // 控制标签的显示/隐藏逻辑（可以根据需求添加具体标签）
     },
+
 
     // 滑动条改变速度
     showValue(newValue) {
