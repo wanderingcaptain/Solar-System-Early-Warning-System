@@ -72,12 +72,15 @@ export default {
       solid: false,       // 控制轨道显示
       solidLabels: false, // 控制标签显示
       epoch: new Date('December 9, 2014'), // 起始时间
+      earthPosition: [0, 0, 0], // 用于存储地球当前的三维位置
+      alertDistance: 0.1, // 预警距离（可根据需要调整，单位：AU）
     };
   },
+
   mounted() {
     this.initializeSolarSystem(); // 初始化场景和天体
     this.addCometsFromJson('https://data.nasa.gov/resource/b67r-rgxc.json');
-    // this.addBodiesFromCsv('/sbdb_query_results.csv'); // 添加星体数据
+    this.addBodiesFromCsv('/sbdb_query_results.csv'); // 添加星体数据
     this.traceOrbits();           // 绘制轨道
     setInterval(this.updatePosition, 50); // 更新天体位置，每50ms更新一次
   },
@@ -95,14 +98,14 @@ export default {
       this.heavenlyBodies.push(new Trajectory("Neptune", 30.06992276, 1.77004347, 44.96476227, 0.00859048, 131.78422574, -55.12002969, 164.79132));
 
       // 添加天体到X3D场景
-      this.addNode("Mercury", 0.7, 0.2, 0.4, 0.024, "Mercury");
-      this.addNode("Venus", 0.9, 0.9, 0.9, 0.061, "Venus");
-      this.addNode("theEarth", 0.2, 0, 0.8, 0.064, "Earth");
-      this.addNode("Mars", 1, 0.1, 0.15, 0.034, "Mars");
-      this.addNode("Jupiter", 1, 0.5, 0, 0.699, "Jupiter");
-      this.addNode("Saturn", 0.9, 0.7, 0.1, 0.582, "Saturn");
-      this.addNode("Uranus", 0.6, 0.8, 1, 0.254, "Uranus");
-      this.addNode("Neptune", 0.1, 0.2, 0.9, 0.246, "Neptune");
+      this.addNode("Mercury", 0.7, 0.2, 0.4, 0.024, "Mercury", true);
+      this.addNode("Venus", 0.9, 0.9, 0.9, 0.061, "Venus", true);
+      this.addNode("theEarth", 0.2, 0, 0.8, 0.064, "Earth", true);
+      this.addNode("Mars", 1, 0.1, 0.15, 0.034, "Mars", true);
+      this.addNode("Jupiter", 1, 0.5, 0, 0.699, "Jupiter", true);
+      this.addNode("Saturn", 0.9, 0.7, 0.1, 0.582, "Saturn", true);
+      this.addNode("Uranus", 0.6, 0.8, 1, 0.254, "Uranus", true);
+      this.addNode("Neptune", 0.1, 0.2, 0.9, 0.246, "Neptune", true);
     },
 
     // 异步读取和解析 CSV 文件，并添加星体
@@ -127,10 +130,10 @@ export default {
               const i = parseFloat(body.i);             // 倾角
               const w = parseFloat(body.w);             // 近日点参数
               const node = parseFloat(body.om);         // 升交点经度
-              const period = parseFloat(body.per)/365.25;      // 轨道周期
+              const period = parseFloat(body.per) / 365.25;      // 轨道周期
               const tp = parseFloat(body.tp);           // 近日点通过时间
               const epoch = 2460600.5; // 当前纪元（儒略日格式）
-              
+
               // 计算平近点角 M
               const T = period * 365.25;               // 轨道周期，转换为天
               const M = ((2 * Math.PI) / T) * (epoch - tp); // 计算平近点角
@@ -142,10 +145,10 @@ export default {
               // 添加到 heavenlyBodies 列表中
               this.heavenlyBodies.push(bodyTrajectory);
 
-              // 设置颜色、大小，并添加到 X3D 场景中
+              //设置颜色、大小，并添加到 X3D 场景中
               const colorR = 0.5, colorG = 0.5, colorB = 1;
               const radius = parseFloat(body.diameter) / 1000 || 0.05; // 如果有直径，缩放后使用；否则使用默认值
-              this.addNode(name, colorR, colorG, colorB, radius, name);
+              this.addNode(name, colorR, colorG, colorB, radius, name, false);
             });
           },
           error: (error) => {
@@ -184,7 +187,7 @@ export default {
 
           const colorR = 0.5, colorG = 0.5, colorB = 1;
           const radius = 0.05;
-          this.addNode(name, colorR, colorG, colorB, radius, name);
+          this.addNode(name, colorR, colorG, colorB, radius, name, false);
           // this.traceOrbits();  //绘制轨道电脑会很卡
         });
       } catch (error) {
@@ -193,26 +196,31 @@ export default {
     },
 
     // 添加天体到X3D场景
-    addNode(identifier, cR, cG, cB, radius, label) {
+    addNode(identifier, cR, cG, cB, radius, label, defaultVisible = true) {
+      // 创建 Switch 节点用于控制显示和隐藏
+      const switchNode = document.createElement('Switch');
+      switchNode.setAttribute('id', identifier + '_Switch');
+      switchNode.setAttribute('whichChoice', defaultVisible ? '0' : '-1');  // 默认显示行星，隐藏小行星
+
       // 创建 Transform 节点用于存放天体的空间变换
       const t = document.createElement('Transform');
       t.setAttribute('translation', '0 0 -5'); // 设置初始位置
-      t.setAttribute('id', identifier);        // 设置节点的 id，使用天体标识符
+      t.setAttribute('id', identifier);
 
       // 创建 Shape 节点表示天体的形状
       const s = document.createElement('Shape');
-      const app = document.createElement('Appearance');   // 创建 Appearance 节点用于定义外观
-      const mat = document.createElement('Material');     // 创建 Material 节点用于定义材质颜色
+      const app = document.createElement('Appearance');
+      const mat = document.createElement('Material');
       mat.setAttribute('id', identifier + 'Mat');
       mat.setAttribute('diffuseColor', `${cR} ${cG} ${cB}`); // 设置材质的漫反射颜色
-      app.appendChild(mat);                               // 将材质添加到外观节点
-      s.appendChild(app);                                 // 将外观添加到形状节点
+      app.appendChild(mat);
+      s.appendChild(app);
 
-      // 创建 Sphere 节点表示天体的几何形状
       const b = document.createElement('Sphere');
-      b.setAttribute('radius', radius);                   // 设置球体半径
-      s.appendChild(b);                                   // 将球体添加到形状节点
-      t.appendChild(s);                                   // 将形状节点添加到 Transform 节点
+      b.setAttribute('radius', radius);  // 设置球体半径
+      s.appendChild(b);
+      t.appendChild(s);  // 将形状节点添加到 Transform 节点
+      switchNode.appendChild(t);  // 添加 Transform 节点到 Switch 节点
 
       // 添加标签
       const billboard = document.createElement('Billboard');
@@ -236,9 +244,13 @@ export default {
       labelTransform.appendChild(labelShape);
       billboard.appendChild(labelTransform);
       t.appendChild(billboard);
-      // 找到场景中的太阳节点，并将天体添加到该节点下
+
+      // 添加到场景中的太阳节点
       const ot = document.getElementById('theSun');
-      ot.appendChild(t);                                  // 将新天体添加到场景
+      if (ot) {
+        ot.appendChild(switchNode);
+        console.log(`Added node with ID: ${identifier} in switch`);
+      }
     },
 
     // 计算和绘制轨道
@@ -284,19 +296,50 @@ export default {
       }
     },
 
-    // 更新天体位置
     updatePosition() {
+      if (!this.heavenlyBodies.length) {
+        console.warn("Heavenly bodies not initialized");
+        return;
+      }
+
       for (const hB of this.heavenlyBodies) {
         // 更新真实近点角
         hB.trueAnomoly += (2 * Math.PI) * this.simSpeed / (hB.period * 365.25);
         if (hB.trueAnomoly > 2 * Math.PI) {
-          hB.trueAnomoly -= 2 * Math.PI; // 确保角度不会超出 2π
+          hB.trueAnomoly -= 2 * Math.PI;
         }
         const currentPosition = this.propagate(hB, hB.trueAnomoly);
-        document.getElementById(hB.name).setAttribute('translation', currentPosition.join(' '));
+
+        // 更新地球位置
+        if (hB.name === "theEarth") {
+          this.earthPosition = currentPosition;
+        }
+
+        // 计算小行星与地球的距离
+        if (hB.name.startsWith("NEO")) {
+          const distance = Math.sqrt(
+            Math.pow(currentPosition[0] - this.earthPosition[0], 2) +
+            Math.pow(currentPosition[1] - this.earthPosition[1], 2) +
+            Math.pow(currentPosition[2] - this.earthPosition[2], 2)
+          );
+
+          // 如果距离小于预警距离，则显示小行星和轨道
+          if (distance < this.alertDistance) {
+            this.showAsteroidAndOrbit(hB.name, true);  // 显示
+          } else {
+            this.showAsteroidAndOrbit(hB.name, false); // 隐藏
+          }
+        }
+
+        // 更新天体位置
+        const asteroid = document.getElementById(hB.name);
+        if (asteroid) {
+          asteroid.setAttribute('translation', currentPosition.join(' '));
+        }
       }
-      this.updateTheDate();
     },
+
+
 
     // 更新日期
     updateTheDate() {
@@ -328,6 +371,17 @@ export default {
       // 切换标签显示/隐藏的状态
       this.solidLabels = !this.solidLabels;
     },
+    // 显示或隐藏小行星及其轨道
+    showAsteroidAndOrbit(identifier, show) {
+      const switchNode = document.getElementById(identifier + '_Switch');  // 获取 Switch 节点
+      if (switchNode) {
+        const whichChoice = show ? '0' : '-1';  // '0' 表示显示第一个子节点，'-1' 表示隐藏所有子节点
+        switchNode.setAttribute('whichChoice', whichChoice);
+      } else {
+        console.warn(`Switch node for ${identifier} not found.`);
+      }
+    },
+
 
 
     // 滑动条改变速度
