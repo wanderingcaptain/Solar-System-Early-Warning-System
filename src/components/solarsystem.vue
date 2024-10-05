@@ -7,6 +7,7 @@
       <li>Left-click and drag to rotate model</li>
       <li>Middle-click and drag to move model</li>
       <li>Press the key 'A' to observe the entire system</li>
+      <li>There is an alert feature detects the proximity of asteroids to Earth and dynamically displays their position and orbit when they come within a specified distance(0.5au).</li>
     </ul>
 
     <x3d width="100%" height="40%">
@@ -73,7 +74,7 @@ export default {
       solidLabels: false, // 控制标签显示
       epoch: new Date('December 9, 2014'), // 起始时间
       earthPosition: [0, 0, 0], // 用于存储地球当前的三维位置
-      alertDistance: 0.1, // 预警距离（可根据需要调整，单位：AU）
+      alertDistance: 0.5, // 预警距离（可根据需要调整，单位：AU）
     };
   },
 
@@ -297,47 +298,55 @@ export default {
     },
 
     updatePosition() {
-      if (!this.heavenlyBodies.length) {
-        console.warn("Heavenly bodies not initialized");
-        return;
+  if (!this.heavenlyBodies.length) {
+    console.warn("Heavenly bodies not initialized");
+    return;
+  }
+
+  // 八大行星的名称列表
+  const majorPlanets = ["Mercury", "Venus", "theEarth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune"];
+
+  for (const hB of this.heavenlyBodies) {
+    // 更新真实近点角
+    hB.trueAnomoly += (2 * Math.PI) * this.simSpeed / (hB.period * 365.25);
+    if (hB.trueAnomoly > 2 * Math.PI) {
+      hB.trueAnomoly -= 2 * Math.PI;
+    }
+    const currentPosition = this.propagate(hB, hB.trueAnomoly);
+
+    // 更新地球位置
+    if (hB.name === "theEarth") {
+      this.earthPosition = currentPosition;
+    }
+
+    // 如果是八大行星，始终显示
+    if (majorPlanets.includes(hB.name)) {
+      this.showAsteroidAndOrbit(hB.name, true);  // 始终显示八大行星
+    } else {
+      // 计算天体与地球的距离
+      const distance = Math.sqrt(
+        Math.pow(currentPosition[0] - this.earthPosition[0], 2) +
+        Math.pow(currentPosition[1] - this.earthPosition[1], 2) +
+        Math.pow(currentPosition[2] - this.earthPosition[2], 2)
+      );
+
+      // 如果距离小于预警距离，则显示天体和轨道
+      if (distance < this.alertDistance) {
+        this.showAsteroidAndOrbit(hB.name, true);  // 显示
+      } else {
+        this.showAsteroidAndOrbit(hB.name, false); // 隐藏
       }
+    }
 
-      for (const hB of this.heavenlyBodies) {
-        // 更新真实近点角
-        hB.trueAnomoly += (2 * Math.PI) * this.simSpeed / (hB.period * 365.25);
-        if (hB.trueAnomoly > 2 * Math.PI) {
-          hB.trueAnomoly -= 2 * Math.PI;
-        }
-        const currentPosition = this.propagate(hB, hB.trueAnomoly);
+    // 更新天体位置
+    const asteroid = document.getElementById(hB.name);
+    if (asteroid) {
+      asteroid.setAttribute('translation', currentPosition.join(' '));
+    }
+  }
+      this.updateTheDate();
+},
 
-        // 更新地球位置
-        if (hB.name === "theEarth") {
-          this.earthPosition = currentPosition;
-        }
-
-        // 计算小行星与地球的距离
-        if (hB.name.startsWith("NEO")) {
-          const distance = Math.sqrt(
-            Math.pow(currentPosition[0] - this.earthPosition[0], 2) +
-            Math.pow(currentPosition[1] - this.earthPosition[1], 2) +
-            Math.pow(currentPosition[2] - this.earthPosition[2], 2)
-          );
-
-          // 如果距离小于预警距离，则显示小行星和轨道
-          if (distance < this.alertDistance) {
-            this.showAsteroidAndOrbit(hB.name, true);  // 显示
-          } else {
-            this.showAsteroidAndOrbit(hB.name, false); // 隐藏
-          }
-        }
-
-        // 更新天体位置
-        const asteroid = document.getElementById(hB.name);
-        if (asteroid) {
-          asteroid.setAttribute('translation', currentPosition.join(' '));
-        }
-      }
-    },
 
 
 
