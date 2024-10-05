@@ -1,11 +1,12 @@
 <template>
   <div>
-    <h1>Venus, Earth, Mars and Potentially Hazardous Asteroids (PHA)*</h1>
-    <h2>Slider control adjusts the simulation speed.</h2>
+    <h1>Solar system and Near-Earth Objects system</h1>
+    <!-- <h2>Slider control adjusts the simulation speed.</h2> -->
     <ul>
       <li>Right-click and drag to zoom in and out</li>
       <li>Left-click and drag to rotate model</li>
       <li>Middle-click and drag to move model</li>
+      <li>Press the key 'A' to observe the entire system</li>
     </ul>
 
     <x3d width="100%" height="40%">
@@ -36,9 +37,9 @@
       </scene>
     </x3d>
 
-    <input type="range" id="myRange" min="1" max="100" value="100" step="1" onchange="showValue(this.value)" /><br>
-    <input type="button" id="orbits" value="Toggle Orbits" @click="toggleOrbits" />
-    <input type="button" id="labels" value="Toggle Labels" @click="toggleLabels" />
+    <!-- <input type="range" id="myRange" min="1" max="100" value="100" step="1" onchange="showValue(this.value)" /><br> -->
+    <!-- <input type="button" id="orbits" value="Toggle Orbits" @click="toggleOrbits" /> -->
+    <!-- <input type="button" id="labels" value="Toggle Labels" @click="toggleLabels" /> -->
 
     <p id="modelDate"></p>
     <p class="case" align="center"><i>*Objects are not to scale</i></p>
@@ -60,6 +61,7 @@ function Trajectory(name, smA, oI, aP, oE, aN, mAe, Sidereal) {
   this.position = [0, 0, 0];              // 当前天体的三维位置
   this.time = 0;                          // 记录天体运动的时间
 }
+import Papa from 'papaparse'; // 引入 PapaParse 库
 
 export default {
   name: 'SolarSystem',
@@ -75,6 +77,7 @@ export default {
   mounted() {
     this.initializeSolarSystem(); // 初始化场景和天体
     this.addCometsFromJson('https://data.nasa.gov/resource/b67r-rgxc.json');
+    // this.addBodiesFromCsv('/sbdb_query_results.csv'); // 添加星体数据
     this.traceOrbits();           // 绘制轨道
     setInterval(this.updatePosition, 50); // 更新天体位置，每50ms更新一次
   },
@@ -102,6 +105,57 @@ export default {
       this.addNode("Neptune", 0.1, 0.2, 0.9, 0.246, "Neptune");
     },
 
+    // 异步读取和解析 CSV 文件，并添加星体
+    async addBodiesFromCsv(csvFilePath) {
+      try {
+        // 使用 fetch 加载 CSV 文件
+        const response = await fetch(csvFilePath);
+        const csvText = await response.text();
+
+        // 使用 PapaParse 解析 CSV
+        Papa.parse(csvText, {
+          header: true, // 确保 CSV 文件中的第一行作为键
+          skipEmptyLines: true, // 跳过空行
+          complete: (results) => {
+            const bodiesData = results.data;
+
+            // 遍历每个星体数据，提取并创建 Trajectory 对象
+            bodiesData.forEach(body => {
+              const name = body.full_name; // 使用full_name 作为名称
+              const smA = parseFloat(body.a);           // 半长轴
+              const e = parseFloat(body.e);             // 离心率
+              const i = parseFloat(body.i);             // 倾角
+              const w = parseFloat(body.w);             // 近日点参数
+              const node = parseFloat(body.om);         // 升交点经度
+              const period = parseFloat(body.per)/365.25;      // 轨道周期
+              const tp = parseFloat(body.tp);           // 近日点通过时间
+              const epoch = 2460600.5; // 当前纪元（儒略日格式）
+              
+              // 计算平近点角 M
+              const T = period * 365.25;               // 轨道周期，转换为天
+              const M = ((2 * Math.PI) / T) * (epoch - tp); // 计算平近点角
+              const mae = M % (2 * Math.PI);           // 归一化平近点角
+
+              // 使用 Trajectory 函数创建星体轨道
+              const bodyTrajectory = new Trajectory(name, smA, i, w, e, node, mae, period);
+
+              // 添加到 heavenlyBodies 列表中
+              this.heavenlyBodies.push(bodyTrajectory);
+
+              // 设置颜色、大小，并添加到 X3D 场景中
+              const colorR = 0.5, colorG = 0.5, colorB = 1;
+              const radius = parseFloat(body.diameter) / 1000 || 0.05; // 如果有直径，缩放后使用；否则使用默认值
+              this.addNode(name, colorR, colorG, colorB, radius, name);
+            });
+          },
+          error: (error) => {
+            console.error("解析 CSV 时发生错误: ", error);
+          }
+        });
+      } catch (error) {
+        console.error("获取或处理 CSV 文件时发生错误: ", error);
+      }
+    },
     // 异步获取彗星数据并添加到轨道
     async addCometsFromJson(url) {
       try {
